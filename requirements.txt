@@ -1,0 +1,4 @@
+accelerate
+docarray
+torch
+transformers
