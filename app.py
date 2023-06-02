@@ -5,8 +5,8 @@ from typing import List, Optional
 import pandas as pd
 import streamlit as st
 from docarray import BaseDoc
-from docarray.typing import TorchTensor
 from docarray.index import InMemoryExactNNIndex
+from docarray.typing import TorchTensor
 from transformers import pipeline
 
 INDEX_PATH = Path(__file__).parent.joinpath("data/index.bin")

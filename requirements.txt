@@ -1,4 +1,6 @@
 accelerate
 docarray
+pandas
+streamlit
 torch
 transformers
