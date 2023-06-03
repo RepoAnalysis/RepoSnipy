@@ -10,12 +10,18 @@ app_file: app.py
 pinned: true
 license: mit
 ---
-
-# RepoSnipy
+# RepoSnipy 🐍🔫
 
 [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/raw/main/open-in-hf-spaces-md-dark.svg)](https://huggingface.co/spaces/Lazyhope/RepoSnipy)
 
 Neural search engine for discovering semantically similar Python repositories on GitHub.
+
+## Demo
+
+Searching an indexed repository:
+
+![Search Indexed Repo Demo](assets/search.gif)
+
 
 ## About
 
