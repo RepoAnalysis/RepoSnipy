@@ -109,7 +109,7 @@ st.text_input(
     "Enter a GitHub repo URL or owner/repo (case-sensitive):",
     value="",
     max_chars=200,
-    placeholder="huggingface/transformers",
+    placeholder="numpy/numpy",
     key="repo_input",
 )
 
