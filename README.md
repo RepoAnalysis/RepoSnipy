@@ -1,3 +1,16 @@
+---
+title: RepoSnipy
+emoji: 🐍🔫
+colorFrom: grey
+colorTo: grey
+sdk: streamlit
+sdk_version: 1.21.0
+python_version: 3.11.3
+app_file: app.py
+pinned: true
+license: mit
+---
+
 # RepoSnipy
 
 [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/raw/main/open-in-hf-spaces-md-dark.svg)](https://huggingface.co/spaces/Lazyhope/RepoSnipy)
