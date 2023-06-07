@@ -16,7 +16,7 @@ INDEX_PATH = Path(__file__).parent.joinpath("data/index.bin")
 def load_index():
     class RepoDoc(BaseDoc):
         name: str
-        topics: list  # List[str]
+        topics: List[str]
         stars: int
         license: str
         code_embedding: Optional[TorchTensor[768]]
@@ -161,7 +161,8 @@ if search:
             else:
                 st.success("Repo updated in the index!")
 
-            index.persist(file=INDEX_PATH)
+            with st.spinner("Persisting the index..."):
+                index.persist(file=INDEX_PATH)
 
         st.session_state["query_doc"] = query_doc
     else:
