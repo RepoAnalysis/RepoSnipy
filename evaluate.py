@@ -3,12 +3,12 @@ from math import comb
 from pathlib import Path
 from typing import List, Optional
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from docarray import BaseDoc
 from docarray.index import InMemoryExactNNIndex
 from docarray.typing import TorchTensor
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import auc, roc_curve
 from torch.nn.functional import cosine_similarity
 from tqdm.auto import tqdm
 
