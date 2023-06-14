@@ -27,25 +27,17 @@ class RepoDoc(BaseDoc):
 
 index = InMemoryExactNNIndex[RepoDoc](index_file_path=INDEX_PATH)
 df = index._docs.to_dataframe()
+# Filter out repos without code embedding and select only relevant columns
 code_df = df[df["code_embedding"].notna()][["name", "topics", "code_embedding"]]
-
-all_topics = set()
-for topics in code_df["topics"]:
-    all_topics.update(topics)
-all_topics = sorted(list(all_topics))
-
-topic_model = SentenceTransformer("all-MiniLM-L6-v2")
-word_embeddings = torch.from_numpy(topic_model.encode(all_topics))
-topic_embeddings = dict(zip(all_topics, word_embeddings))
-
-memory = {}
 
 
 def has_same_topic(topics1, topics2):
+    # Find shared topics other than "python" and "python3"
     intersection = set(topics1) & set(topics2) - {"python", "python3"}
     return len(intersection) > 0
 
 
+# Find code similarity and shared topics between all pairs of repos
 rows_list = []
 for row1, row2 in tqdm(
     combinations(code_df.itertuples(), 2), total=comb(len(code_df), 2)
@@ -56,7 +48,7 @@ for row1, row2 in tqdm(
             "repo2": row2.name,
             "has_same_topic": has_same_topic(row1.topics, row2.topics),
             "code_similarity": max(
-                0.0,
+                0.0,  # zero out negative similarities
                 cosine_similarity(
                     row1.code_embedding, row2.code_embedding, dim=0
                 ).item(),
