@@ -57,6 +57,6 @@ for row1, row2 in tqdm(
     )
 
 similarity_df = pd.DataFrame(rows_list)
-similarity_df.to_csv("eval_res.csv", index=False)
+similarity_df.to_csv("code_eval_res.csv", index=False)
 
 print(roc_auc_score(similarity_df["has_same_topic"], similarity_df["code_similarity"]))
