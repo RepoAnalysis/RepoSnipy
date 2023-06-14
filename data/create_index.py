@@ -6,7 +6,6 @@ from docarray.index import InMemoryExactNNIndex
 from docarray.typing import TorchTensor
 from transformers import pipeline
 
-
 REPOS = tuple(
     input("Input repository names as owner/name, seperated by comma: ").split(",")
 )
