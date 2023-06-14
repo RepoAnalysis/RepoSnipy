@@ -4,12 +4,11 @@ from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
-import torch
+import matplotlib.pyplot as plt
 from docarray import BaseDoc
 from docarray.index import InMemoryExactNNIndex
 from docarray.typing import TorchTensor
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve, auc
 from torch.nn.functional import cosine_similarity
 from tqdm.auto import tqdm
 
@@ -59,4 +58,16 @@ for row1, row2 in tqdm(
 similarity_df = pd.DataFrame(rows_list)
 similarity_df.to_csv("code_eval_res.csv", index=False)
 
-print(roc_auc_score(similarity_df["has_same_topic"], similarity_df["code_similarity"]))
+# Plot ROC curve
+y_true, y_score = similarity_df["has_same_topic"], similarity_df["code_similarity"]
+fpr, tpr, _ = roc_curve(y_true, y_score)
+roc_auc = auc(fpr, tpr)
+plt.plot(fpr, tpr, label=f"ROC curve (AUC = {roc_auc:.3f})")
+plt.plot([0, 1], [0, 1], "k--")  # Diagonal line representing random guessing
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel("False Positive Rate (FPR)")
+plt.ylabel("True Positive Rate (TPR)")
+plt.title("Receiver Operating Characteristic (ROC) Curve")
+plt.legend(loc="lower right")
+plt.show()
