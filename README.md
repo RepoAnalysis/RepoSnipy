@@ -10,7 +10,6 @@ Searching an indexed repository:
 
 ![Search Indexed Repo Demo](assets/search.gif)
 
-
 ## About
 
 RepoSnipy is a neural search engine built with [streamlit](https://github.com/streamlit/streamlit) and [docarray](https://github.com/docarray/docarray). You can query a public Python repository hosted on GitHub and find popular repositories that are semantically similar to it.
@@ -32,6 +31,10 @@ Then run the app on your local machine using:
 ```bash
 streamlit run app.py
 ```
+
+## Evaluation
+
+The [evaluation script](evaluate.py) finds all combinations of repository pairs in the dataset and calculates the cosine similarity between their embeddings. It also checks if they share at least one topic (except for `python` and `python3`). Then we compare them and use ROC AUC score to evaluate the embeddings performance. The resultant dataframe containing all pairs of cosine similarity and topics similarity can be downloaded from [here](https://drive.google.com/file/d/1bdR0BwL2WZKy_X6vgaKEauZSjI8DP9gy/view?usp=sharing).
 
 ## License
 
