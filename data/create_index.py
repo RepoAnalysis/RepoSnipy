@@ -1,14 +1,19 @@
 # Run this script and specify repos to create the index.bin file for the web app.
-from typing import List, Optional
-
+import os
+from typing import List
 from docarray import BaseDoc, DocList
 from docarray.index import InMemoryExactNNIndex
-from docarray.typing import TorchTensor
+from docarray.typing import NdArray
 from transformers import pipeline
+from tqdm.auto import tqdm
 
-REPOS = tuple(
-    input("Input repository names as owner/name, seperated by comma: ").split(",")
-)
+# For testing index
+from pathlib import Path
+
+
+# REPOS = tuple(
+#     input("Input repository names as owner/name, seperated by comma: ").split(",")
+# )
 
 
 class RepoDoc(BaseDoc):
@@ -16,30 +21,107 @@ class RepoDoc(BaseDoc):
     topics: List[str]
     stars: int
     license: str
-    code_embedding: Optional[TorchTensor[768]]
-    doc_embedding: Optional[TorchTensor[768]]
+    code_embedding: NdArray[768]
+    doc_embedding: NdArray[768]
+    readme_embedding: NdArray[768]
+    requirement_embedding: NdArray[768]
+    repository_embedding: NdArray[3072]
 
 
-model = pipeline(
-    model="Lazyhope/RepoSim",
-    trust_remote_code=True,
-    device_map="auto",
-)
-
-dl = DocList[RepoDoc]()
-repo_dataset = model(REPOS)
-
-for info in repo_dataset:
-    dl.append(
-        RepoDoc(
-            name=info["name"],
-            topics=info["topics"],
-            stars=info["stars"],
-            license=info["license"],
-            code_embedding=info["mean_code_embedding"],
-            doc_embedding=info["mean_doc_embedding"],
-        )
+def get_model():
+    # model_path = ".\RepoSim4Py"
+    model_path = "Henry65/RepoSim4Py"
+    return pipeline(
+        model=model_path,
+        trust_remote_code=True,
+        device_map="auto",
+        github_token=os.environ.get("GITHUB_TOKEN")
     )
 
-index = InMemoryExactNNIndex[RepoDoc](dl)
-index.persist("index.bin")
+
+def get_repositories():
+    with open("repositories.txt", "r") as file:
+        repositories = file.read().splitlines()
+    return repositories
+
+
+def get_sub_repositories_list(repositories):
+    target_sub_length = len(repositories) // 100
+    sub_repositories_list = []
+    start_index = 0
+
+    while start_index < len(repositories):
+        current_length = min(target_sub_length, len(repositories) - start_index)
+        current_sub_repositories = repositories[start_index: start_index + current_length]
+        sub_repositories_list.append(current_sub_repositories)
+        start_index += current_length
+
+    print(f"We totally have {len(sub_repositories_list)} sub repositories")
+    return sub_repositories_list, target_sub_length
+
+
+def create_index_by_sub(model, sub_repositories_list, target_sub_length):
+    for i, sub_repositories in tqdm(enumerate(sub_repositories_list)):
+        tqdm.write(f"Processing sub repositories {i}")
+        dl = DocList[RepoDoc]()
+        repo_dataset = model(tuple(sub_repositories))
+
+        for info in repo_dataset:
+            dl.append(
+                RepoDoc(
+                    name=info["name"],
+                    topics=info["topics"],
+                    stars=info["stars"],
+                    license=info["license"],
+                    code_embedding=info["mean_code_embedding"].reshape(-1),
+                    doc_embedding=info["mean_doc_embedding"].reshape(-1),
+                    readme_embedding=info["mean_readme_embedding"].reshape(-1),
+                    requirement_embedding=info["mean_requirement_embedding"].reshape(-1),
+                    repository_embedding=info["mean_repo_embedding"].reshape(-1)
+                )
+            )
+
+        index = InMemoryExactNNIndex[RepoDoc](dl)
+        index.persist(f"index{i}_{i * target_sub_length}.bin")
+
+
+def merge_index(target_sub_length):
+    INDEX_PATH = Path(__file__).parent.joinpath("index0_0.bin")
+    index = InMemoryExactNNIndex[RepoDoc](index_file_path=INDEX_PATH)
+    docs = index._docs
+
+    file_name_list = [f"index{i}_{i * target_sub_length}.bin" for i in range(1, 101)]
+    for file_name in file_name_list:
+        INDEX_PATH_TMP = Path(__file__).parent.joinpath(file_name)
+        index_tmp = InMemoryExactNNIndex[RepoDoc](index_file_path=INDEX_PATH_TMP)
+        docs_tmp = index_tmp._docs
+        docs.extend(docs_tmp)
+
+    index = InMemoryExactNNIndex[RepoDoc](docs)
+    index.persist(f"index.bin")
+
+
+def find_exception_repositories(file_name):
+    INDEX_PATH = Path(__file__).parent.joinpath(file_name)
+    index = InMemoryExactNNIndex[RepoDoc](index_file_path=INDEX_PATH)
+    docs = index._docs
+    docs_set = set([doc.name for doc in docs])
+    repo_set = set(get_repositories())
+    diff_set = repo_set - docs_set
+    with open("exception_repositories.txt", "w") as f:
+        for repo_name in diff_set:
+            print(repo_name, file=f)
+
+
+if __name__ == "__main__":
+    # Creating index
+    model = get_model()
+    repositories = get_repositories()
+    sub_repositories_list, target_sub_length = get_sub_repositories_list(repositories)
+    create_index_by_sub(model, sub_repositories_list, target_sub_length)
+
+    # Merging index
+    merge_index(target_sub_length)
+
+    # Finding exception repositories
+    find_exception_repositories("index.bin")
