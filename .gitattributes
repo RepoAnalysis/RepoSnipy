@@ -1,1 +1,2 @@
 data/index.bin filter=lfs diff=lfs merge=lfs -text
+data/index_reduced.bin filter=lfs diff=lfs merge=lfs -text

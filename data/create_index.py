@@ -1,6 +1,7 @@
 # Run this script and specify repos to create the index.bin file for the web app.
 import os
-from typing import List
+import numpy as np
+from typing import List, Optional
 from docarray import BaseDoc, DocList
 from docarray.index import InMemoryExactNNIndex
 from docarray.typing import NdArray
@@ -21,11 +22,11 @@ class RepoDoc(BaseDoc):
     topics: List[str]
     stars: int
     license: str
-    code_embedding: NdArray[768]
-    doc_embedding: NdArray[768]
-    readme_embedding: NdArray[768]
-    requirement_embedding: NdArray[768]
-    repository_embedding: NdArray[3072]
+    code_embedding: Optional[NdArray[768]]
+    doc_embedding: Optional[NdArray[768]]
+    readme_embedding: Optional[NdArray[768]]
+    requirement_embedding: Optional[NdArray[768]]
+    repository_embedding: Optional[NdArray[3072]]
 
 
 def get_model():
@@ -112,6 +113,24 @@ def find_exception_repositories(file_name):
         for repo_name in diff_set:
             print(repo_name, file=f)
 
+def remove_zero_vectors(file_name1, file_name2):
+    INDEX_PATH = Path(__file__).parent.joinpath(file_name1)
+    index = InMemoryExactNNIndex[RepoDoc](index_file_path=INDEX_PATH)
+    docs = index._docs
+    for doc in docs:
+        if np.all(doc.code_embedding == 0):
+            doc.code_embedding = None
+        if np.all(doc.doc_embedding == 0):
+            doc.doc_embedding = None
+        if np.all(doc.requirement_embedding == 0):
+            doc.requirement_embedding = None
+        if np.all(doc.readme_embedding == 0):
+            doc.readme_embedding = None
+        if np.all(doc.repository_embedding == 0):
+            doc.repository_embedding = None
+
+    index = InMemoryExactNNIndex[RepoDoc](docs)
+    index.persist(file_name2)
 
 if __name__ == "__main__":
     # Creating index
@@ -125,3 +144,6 @@ if __name__ == "__main__":
 
     # Finding exception repositories
     find_exception_repositories("index.bin")
+
+    # Removing numpy zero arrays in index
+    remove_zero_vectors("index.bin", "index_reduced.bin")

@@ -1,6 +1,7 @@
 accelerate
 docarray
 pandas
+numpy
 streamlit
 torch
 transformers

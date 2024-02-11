@@ -3,13 +3,14 @@ from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
+import numpy as np
 import streamlit as st
 from docarray import BaseDoc
 from docarray.index import InMemoryExactNNIndex
-from docarray.typing import TorchTensor
+from docarray.typing import NdArray
 from transformers import pipeline
 
-INDEX_PATH = Path(__file__).parent.joinpath("data/index.bin")
+INDEX_PATH = Path(__file__).parent.joinpath("data/index_reduced.bin")
 
 
 @st.cache_resource(show_spinner="Loading dataset...")
@@ -19,8 +20,11 @@ def load_index():
         topics: List[str]
         stars: int
         license: str
-        code_embedding: Optional[TorchTensor[768]]
-        doc_embedding: Optional[TorchTensor[768]]
+        code_embedding: Optional[NdArray[768]]
+        doc_embedding: Optional[NdArray[768]]
+        readme_embedding: Optional[NdArray[768]]
+        requirement_embedding: Optional[NdArray[768]]
+        repository_embedding: Optional[NdArray[3072]]
 
     default_doc = RepoDoc(
         name="",
@@ -29,24 +33,27 @@ def load_index():
         license="",
         code_embedding=None,
         doc_embedding=None,
+        readme_embedding=None,
+        requirement_embedding=None,
+        repository_embedding=None
     )
 
     return InMemoryExactNNIndex[RepoDoc](index_file_path=INDEX_PATH), default_doc
 
 
-@st.cache_resource(show_spinner="Loading RepoSim pipeline...")
+@st.cache_resource(show_spinner="Loading RepoSim4Py pipeline...")
 def load_model():
     return pipeline(
-        model="Lazyhope/RepoSim",
+        model="Henry65/RepoSim4Py",
         trust_remote_code=True,
-        device_map="auto",
+        device_map="auto"
     )
 
 
 @st.cache_data(show_spinner=False)
 def run_model(_model, repo_name, github_token):
     with st.spinner(
-        f"Downloading and extracting the {repo_name}, this may take a while..."
+            f"Downloading and extracting the {repo_name}, this may take a while..."
     ):
         extracted_infos = _model.preprocess(repo_name, github_token=github_token)
 
@@ -54,7 +61,7 @@ def run_model(_model, repo_name, github_token):
         return None
 
     with st.spinner(f"Generating embeddings for {repo_name}..."):
-        repo_info = _model.forward(extracted_infos, st_progress=st.progress(0.0))[0]
+        repo_info = _model.forward(extracted_infos)[0]
 
     return repo_info
 
@@ -100,7 +107,6 @@ with st.sidebar:
         key="display_columns",
     )
 
-
 repo_regex = r"^((git@|http(s)?://)?(github\.com)(/|:))?(?P<owner>[\w.-]+)(/)(?P<repo>[\w.-]+?)(\.git)?(/)?$"
 
 st.title("RepoSnipy")
@@ -120,13 +126,11 @@ st.checkbox(
     help="Encode the latest version of this repo and add/update it to the index",
 )
 
-
 search = st.button("Search")
 if search:
     match_res = re.match(repo_regex, st.session_state.repo_input)
     if match_res is not None:
         repo_name = f"{match_res.group('owner')}/{match_res.group('repo')}"
-
         records = index.filter({"name": {"$eq": repo_name}})
         query_doc = default_doc.copy() if not records else records[0]
         if st.session_state.update_index or not records:
@@ -140,8 +144,16 @@ if search:
             query_doc.topics = repo_info["topics"]
             query_doc.stars = repo_info["stars"]
             query_doc.license = repo_info["license"]
-            query_doc.code_embedding = repo_info["mean_code_embedding"]
-            query_doc.doc_embedding = repo_info["mean_doc_embedding"]
+            query_doc.code_embedding = None if np.all(repo_info["mean_code_embedding"] == 0) else repo_info[
+                "mean_code_embedding"].reshape(-1)
+            query_doc.doc_embedding = None if np.all(repo_info["mean_doc_embedding"] == 0) else repo_info[
+                "mean_doc_embedding"].reshape(-1)
+            query_doc.readme_embedding = None if np.all(repo_info["mean_readme_embedding"] == 0) else repo_info[
+                "mean_readme_embedding"].reshape(-1)
+            query_doc.requirement_embedding = None if np.all(repo_info["mean_requirement_embedding"] == 0) else \
+                repo_info["mean_requirement_embedding"].reshape(-1)
+            query_doc.repository_embedding = None if np.all(repo_info["mean_repo_embedding"] == 0) else repo_info[
+                "mean_repo_embedding"].reshape(-1)
 
         if st.session_state.update_index:
             if not records:
@@ -149,11 +161,10 @@ if search:
                     st.warning(
                         "License is missing in this repo and will not be persisted!"
                     )
-                elif (
-                    query_doc.code_embedding is None and query_doc.doc_embedding is None
-                ):
+                elif (query_doc.code_embedding is None) or (query_doc.doc_embedding is None) or (
+                        query_doc.requirement_embedding is None) or (query_doc.readme_embedding is None):
                     st.warning(
-                        "This repo has no function code or docstring extracted and will not be persisted!"
+                        "This repo has no completed information (code, docstring, readme and requirement) extracted and will not be persisted!"
                     )
                 else:
                     index.index(query_doc)
@@ -185,7 +196,9 @@ if "query_doc" in st.session_state:
     )
 
     display_columns = st.session_state.display_columns
-    code_sim_tab, doc_sim_tab = st.tabs(["Code Similarity", "Docstring Similarity"])
+    code_sim_tab, doc_sim_tab, readme_sim_tab, requirement_sim_tab, repo_sim_tab = st.tabs(
+        ["Code Similarity", "Docstring Similarity", "Readme Similarity", "Requirement Similarity",
+         "Repository Similarity"])
 
     if query_doc.code_embedding is not None:
         code_sim_res = run_search(index, query_doc, "code_embedding", limit)
@@ -198,3 +211,19 @@ if "query_doc" in st.session_state:
         doc_sim_tab.dataframe(doc_sim_res[display_columns])
     else:
         doc_sim_tab.error("No function docstring was extracted for this repo!")
+
+    if query_doc.readme_embedding is not None:
+        readme_sim_res = run_search(index, query_doc, "readme_embedding", limit)
+        readme_sim_tab.dataframe(readme_sim_res[display_columns])
+    else:
+        readme_sim_tab.error("No readme file was extracted for this repo!")
+
+    if query_doc.requirement_embedding is not None:
+        requirement_sim_res = run_search(index, query_doc, "requirement_embedding", limit)
+        requirement_sim_tab.dataframe(requirement_sim_res[display_columns])
+    else:
+        requirement_sim_tab.error("No requirement file was extracted for this repo!")
+
+    if query_doc.repository_embedding is not None:
+        repo_sim_res = run_search(index, query_doc, "repository_embedding", limit)
+        repo_sim_tab.dataframe(repo_sim_res[display_columns])
